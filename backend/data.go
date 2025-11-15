@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
 
 var projectId = "rentify-478316"
@@ -32,6 +34,7 @@ type listing struct {
 	Applications         []application `firestore:"applications"`
 	Price                float64       `firestore:"price"`
 	Interval             string        `firestore:"interval"`
+	Available            bool          `firestore:"available"`
 }
 
 type application struct {
@@ -64,6 +67,8 @@ func getUser(ctx context.Context, client *firestore.Client, userID string) (*use
 
 		return nil, fmt.Errorf("failed to convert firestore data to user struct: %w", err)
 	}
+
+	user.ID = docRef.ID
 
 	return &user, nil
 }
@@ -100,6 +105,31 @@ func deleteUser(ctx context.Context, client *firestore.Client, User user) error 
 	return nil
 }
 
+func getAllListings(ctx context.Context, client *firestore.Client) ([]listing, error) {
+	iter := client.Collection("listings").Documents(ctx)
+	var listings []listing
+	for {
+		doc, err := iter.Next()
+
+		if err == iterator.Done {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		var Listing listing
+		err = doc.DataTo(&Listing)
+		if err != nil {
+			return nil, err
+		}
+		Listing.ID = doc.Ref.ID
+		listings = append(listings, Listing)
+	}
+
+	return listings, nil
+}
+
 func getListing(ctx context.Context, client *firestore.Client, listingID string) (*listing, error) {
 	docRef := client.Collection("listings").Doc(listingID)
 
@@ -114,7 +144,7 @@ func getListing(ctx context.Context, client *firestore.Client, listingID string)
 
 		return nil, fmt.Errorf("failed to convert firestore data to listing struct: %w", err)
 	}
-
+	Listing.ID = docRef.ID
 	return &Listing, nil
 }
 
@@ -138,8 +168,8 @@ func updateListing(ctx context.Context, client *firestore.Client, Listing listin
 	return nil
 }
 
-func deleteListing(ctx context.Context, client *firestore.Client, Listing listing) error {
-	_, err := client.Collection("listings").Doc(Listing.ID).Delete(ctx)
+func deleteListing(ctx context.Context, client *firestore.Client, listingId string) error {
+	_, err := client.Collection("listings").Doc(listingId).Delete(ctx)
 
 	if err != nil {
 		return err
@@ -150,13 +180,39 @@ func deleteListing(ctx context.Context, client *firestore.Client, Listing listin
 
 func applyForListing(ctx context.Context, client *firestore.Client, listingId string, Application application) error {
 	Listing, err := getListing(ctx, client, listingId)
+	if !Listing.Available {
+		return errors.New("listing is not available")
+	}
+	if err != nil {
+		return err
+	}
+	Application.Status = "pending"
+	Listing.Applications = append(Listing.Applications, Application)
+	return updateListing(ctx, client, *Listing, listingId)
+}
 
+func approveApplication(ctx context.Context, client *firestore.Client, listingId string, listingCreatorId string, applicationAuthor string) error {
+
+	Listing, err := getListing(ctx, client, listingId)
+	if !Listing.Available {
+		return errors.New("listing is not available")
+	}
 	if err != nil {
 		return err
 	}
 
-	Listing.Applications = append(Listing.Applications, Application)
-	return updateListing(ctx, client, *Listing, listingId)
+	if listingCreatorId == Listing.Author {
+		for _, application := range Listing.Applications {
+			if applicationAuthor == application.Author {
+				application.Status = "approved"
+				Listing.Available = false
+				return nil
+			}
+		}
+		return errors.New("application not found")
+	} else {
+		return errors.New("listing does not belong to this creator")
+	}
 }
 
 func unApplyForListing(ctx context.Context, client *firestore.Client, listingId string, authorId string) error {

@@ -22,7 +22,7 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestGetUser(t *testing.T) {
-	User, err := getUser(context.Background(), client, "wjciBppDMQzc1p6mHc7q")
+	User, err := getUser(context.Background(), client, "9XP6UIez9UWjG2OuN3J1")
 
 	if err != nil {
 		t.Fatal(err)

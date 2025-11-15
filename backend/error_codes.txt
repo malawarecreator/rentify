@@ -1,2 +1,0 @@
-LISTING_NOT_FOUND: Could not find listing
-NORESULT: Function has returned no result
