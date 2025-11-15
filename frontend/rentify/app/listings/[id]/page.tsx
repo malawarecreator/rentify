@@ -1,44 +1,123 @@
-// app/listings/[id]/page.tsx
 "use client";
 
-import React, { useState } from "react";
-import { useParams } from "next/navigation";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import {
+  applyForListing,
+  fetchListing,
+  rateListing,
+  type Listing,
+} from "@/lib/api";
+import { useUser } from "@/components/user/UserProvider";
 
 export default function ListingDetailPage() {
-  const params = useParams();
-  const id = params?.id;
+  const params = useParams<{ id: string }>();
+  const listingId = typeof params?.id === "string" ? params.id : "";
+  const { user } = useUser();
 
-  // Simple MVP listing data
-  const listing = {
-    title: "Power washer available",
-    description: "Perfect for driveways and patios. Located a few minutes away. Daily and weekend rates available.",
-    imageUrl: "https://images.pexels.com/photos/5854188/pexels-photo-5854188.jpeg?auto=compress&cs=tinysrgb&w=800",
-    price: "$18 / day",
-    seller: {
-      name: "Alex Martinez",
-      avatar: "https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=200",
-      rating: 4.9
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [applicationMessage, setApplicationMessage] = useState("");
+  const [applyStatus, setApplyStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratingStatus, setRatingStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [ratingError, setRatingError] = useState<string | null>(null);
+
+  const loadListing = useCallback(async () => {
+    if (!listingId) return;
+    setLoading(true);
+    try {
+      const data = await fetchListing(listingId);
+      setListing(data);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load listing";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [listingId]);
+
+  useEffect(() => {
+    void loadListing();
+  }, [loadListing]);
+
+  const handleApply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user) {
+      setApplyError("You must be logged in to apply.");
+      setApplyStatus("error");
+      return;
+    }
+    if (!listingId) {
+      setApplyError("Listing is still loading. Try again in a moment.");
+      setApplyStatus("error");
+      return;
+    }
+    if (!applicationMessage.trim()) {
+      setApplyError("Share a quick note before applying.");
+      setApplyStatus("error");
+      return;
+    }
+
+    setApplyStatus("loading");
+    setApplyError(null);
+    try {
+      await applyForListing(listingId, {
+        author: user.id,
+        description: applicationMessage.trim(),
+      });
+      setApplyStatus("success");
+      setApplicationMessage("");
+      await loadListing();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to apply";
+      setApplyError(message);
+      setApplyStatus("error");
     }
   };
 
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const handleRate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!user) {
+      setRatingError("You must be logged in to leave a review.");
+      setRatingStatus("error");
+      return;
+    }
+    if (!listingId) {
+      setRatingError("Listing is still loading. Try again in a moment.");
+      setRatingStatus("error");
+      return;
+    }
 
-  const handleApply = async () => {
-    setStatus("sending");
-
-    // Simulate API call
-    setTimeout(() => {
-      setStatus("sent");
-      console.log("Rental request for listing:", id);
-    }, 1000);
+    setRatingStatus("loading");
+    setRatingError(null);
+    try {
+      await rateListing(listingId, {
+        author: user.id,
+        rating: ratingValue,
+        comment: ratingComment.trim(),
+      });
+      setRatingStatus("success");
+      setRatingComment("");
+      await loadListing();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to rate listing";
+      setRatingError(message);
+      setRatingStatus("error");
+    }
   };
 
   return (
     <AppShell>
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Back Button */}
+      <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center">
           <Link
             href="/listings"
@@ -51,59 +130,163 @@ export default function ListingDetailPage() {
           </Link>
         </div>
 
-        {/* Image */}
-        <div className="rounded-2xl border border-green-200 bg-white overflow-hidden">
-          <img
-            src={listing.imageUrl}
-            alt={listing.title}
-            className="w-full h-64 object-cover"
-          />
-        </div>
-
-        {/* Description */}
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{listing.title}</h1>
-          <p className="text-gray-700 leading-relaxed text-lg">{listing.description}</p>
-        </div>
-
-        {/* Owner Info */}
-        <div className="rounded-2xl border border-green-200 bg-white p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">About the Owner</h2>
-          <div className="flex items-center gap-4">
-            <img
-              src={listing.seller.avatar}
-              alt={listing.seller.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-green-200"
-            />
-            <div>
-              <p className="text-lg font-semibold text-gray-900">{listing.seller.name}</p>
-              <p className="text-sm text-gray-600">⭐ {listing.seller.rating} rating</p>
-            </div>
+        {loading && <div className="rounded-xl theme-border-primary theme-bg-accent p-6">Loading…</div>}
+        {error && !loading && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+            {error}
           </div>
-        </div>
+        )}
 
-        {/* Apply Button */}
-        <div className="rounded-2xl border border-green-200 bg-white p-8">
-          <div className="flex items-center justify-between mb-6">
-            <span className="text-3xl font-bold text-green-600">{listing.price}</span>
-          </div>
-
-          <button
-            onClick={handleApply}
-            disabled={status === "sending"}
-            className="w-full rounded-lg bg-green-600 px-6 py-4 text-lg font-semibold text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {status === "sending" ? "Sending..." : "Apply to Rent"}
-          </button>
-
-          {status === "sent" && (
-            <div className="mt-4 p-4 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-lg text-green-800 text-center">
-                ✅ Request sent! The owner will respond soon.
-              </p>
+        {listing && !loading && !error && (
+          <>
+            <div className="rounded-2xl border border-green-200 bg-white overflow-hidden">
+              <img
+                src={listing.storageRelationLinks[0] || "https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=60"}
+                alt={listing.title}
+                className="w-full h-72 object-cover"
+              />
             </div>
-          )}
-        </div>
+
+            <div className="rounded-2xl border border-green-200 bg-green-50 p-8 space-y-4">
+              <h1 className="text-3xl font-bold text-gray-900">{listing.title}</h1>
+              <p className="text-gray-700 leading-relaxed text-lg">{listing.body}</p>
+              <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                <span className="font-semibold text-green-700 text-2xl">
+                  {Number.isFinite(listing.price)
+                    ? `$${listing.price.toFixed(2)} / ${listing.interval || "listing"}`
+                    : "Price not provided"}
+                </span>
+                <span className="rounded-full bg-white px-4 py-1 text-xs font-semibold border border-green-200">
+                  {listing.available ? "Available" : "Currently unavailable"}
+                </span>
+                <span className="text-xs uppercase tracking-[0.16em] text-gray-500">
+                  Owner: {listing.author}
+                </span>
+              </div>
+            </div>
+
+            {listing.storageRelationLinks.length > 1 && (
+              <div className="rounded-2xl border border-green-200 bg-white p-6 space-y-3">
+                <h2 className="text-xl font-semibold text-gray-900">Attachments</h2>
+                <div className="flex flex-wrap gap-3">
+                  {listing.storageRelationLinks.map((url, index) => (
+                    <a
+                      key={`${url}-${index}`}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg border border-green-200 px-4 py-2 text-sm text-green-700 hover:bg-green-50"
+                    >
+                      View file {index + 1}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-6">
+              <h2 className="text-2xl font-semibold text-gray-900">Apply to rent</h2>
+              <form onSubmit={handleApply} className="space-y-4">
+                <textarea
+                  value={applicationMessage}
+                  onChange={(event) => setApplicationMessage(event.target.value)}
+                  placeholder="Share a quick note about how you'll use this item"
+                  rows={4}
+                  className="w-full rounded-lg border border-green-200 bg-white p-3 text-sm focus:border-green-500 focus:outline-none"
+                  disabled={!user}
+                />
+                {!user && (
+                  <p className="text-xs text-red-500">
+                    Log in to submit an application.
+                  </p>
+                )}
+                {applyError && <p className="text-xs text-red-500">{applyError}</p>}
+                {applyStatus === "success" && (
+                  <p className="text-xs text-green-600">Application sent! The owner will review it soon.</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!user || applyStatus === "loading"}
+                  className="w-full rounded-lg bg-green-600 px-6 py-3 text-lg font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                >
+                  {applyStatus === "loading" ? "Sending…" : "Apply to rent"}
+                </button>
+              </form>
+            </div>
+
+            <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-6">
+              <h2 className="text-2xl font-semibold text-gray-900">Ratings</h2>
+              <div className="space-y-4">
+                {listing.ratings.length === 0 ? (
+                  <p className="text-sm text-gray-600">No reviews yet.</p>
+                ) : (
+                  listing.ratings.map((rating, index) => (
+                    <div key={index} className="border border-green-100 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {rating.author} · {rating.rating.toFixed(1)}★
+                      </p>
+                      {rating.comment && <p className="text-sm text-gray-700 mt-1">{rating.comment}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleRate} className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-gray-700">Rating</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    step={0.5}
+                    value={ratingValue}
+                    onChange={(event) => setRatingValue(Number(event.target.value))}
+                    className="w-32 rounded-lg border border-green-200 p-2"
+                    disabled={!user}
+                  />
+                </div>
+                <textarea
+                  value={ratingComment}
+                  onChange={(event) => setRatingComment(event.target.value)}
+                  placeholder="Share feedback with the community"
+                  rows={3}
+                  className="w-full rounded-lg border border-green-200 p-3 text-sm focus:border-green-500 focus:outline-none"
+                  disabled={!user}
+                />
+                {ratingError && <p className="text-xs text-red-500">{ratingError}</p>}
+                {ratingStatus === "success" && (
+                  <p className="text-xs text-green-600">Thanks for submitting a review.</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!user || ratingStatus === "loading"}
+                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-60"
+                >
+                  {ratingStatus === "loading" ? "Submitting…" : "Leave a review"}
+                </button>
+              </form>
+            </div>
+
+            {listing.applications.length > 0 && (
+              <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-4">
+                <h2 className="text-2xl font-semibold text-gray-900">Applications</h2>
+                <ul className="space-y-3 text-sm">
+                  {listing.applications.map((application, index) => (
+                    <li key={index} className="rounded-lg border border-green-100 p-4">
+                      <p className="font-semibold text-gray-900">
+                        {application.author}
+                        <span className="ml-2 text-xs uppercase tracking-wide text-gray-500">
+                          {application.status}
+                        </span>
+                      </p>
+                      <p className="text-gray-700 mt-1">{application.description}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </AppShell>
   );

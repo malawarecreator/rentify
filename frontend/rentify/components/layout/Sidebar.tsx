@@ -32,33 +32,18 @@ const mainNav: NavItem[] = [
   },
 ];
 
-const rentingNav: NavItem[] = [
+const accountNav: NavItem[] = [
   {
-    label: "Outgoing requests",
-    href: "/requests/outgoing",
-    icon: "📤",
-    matchPrefix: "/requests/outgoing",
+    label: "Log in",
+    href: "/login",
+    icon: "🔐",
+    matchPrefix: "/login",
   },
   {
-    label: "Incoming requests",
-    href: "/requests/incoming",
-    icon: "📥",
-    matchPrefix: "/requests/incoming",
-  },
-  {
-    label: "Active rentals",
-    href: "/rentals/active",
-    icon: "✅",
-    matchPrefix: "/rentals/active",
-  },
-];
-
-const commNav: NavItem[] = [
-  {
-    label: "Messages",
-    href: "/messages",
-    icon: "💬",
-    matchPrefix: "/messages",
+    label: "Sign up",
+    href: "/signup",
+    icon: "✨",
+    matchPrefix: "/signup",
   },
 ];
 
@@ -114,8 +99,7 @@ const Sidebar: React.FC = () => {
 
       {/* Sections */}
       {renderSection("Main", mainNav)}
-      {renderSection("Renting", rentingNav)}
-      {renderSection("Communication", commNav)}
+      {renderSection("Account", accountNav)}
 
       {/* Tip card */}
       <div className="mt-auto rounded-xl theme-border-primary theme-bg-accent p-4 text-sm theme-text-primary">
