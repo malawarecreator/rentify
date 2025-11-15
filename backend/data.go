@@ -30,7 +30,8 @@ type listing struct {
 	Author               string        `firestore:"author"`
 	Ratings              []rating      `firestore:"ratings"`
 	Applications         []application `firestore:"applications"`
-	PricePerNight        float64       `firestore:"price"`
+	Price                float64       `firestore:"price"`
+	Interval             string        `firestore:"interval"`
 }
 
 type application struct {

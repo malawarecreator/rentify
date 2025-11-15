@@ -38,10 +38,11 @@ func TestCreateListing(t *testing.T) {
 		StorageRelationLinks: []string{
 			"NOSTORAGE",
 		},
-		Author:        "ID",
-		Ratings:       []rating{},
-		Applications:  []application{},
-		PricePerNight: 6767.7,
+		Author:       "ID",
+		Ratings:      []rating{},
+		Applications: []application{},
+		Price:        6767.7,
+		Interval:     "night",
 	})
 
 	if err != nil {
