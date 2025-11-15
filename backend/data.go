@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
+	"fmt"
 
 	"cloud.google.com/go/firestore"
 )
@@ -18,9 +17,9 @@ type user struct {
 }
 
 type rating struct {
-	Author  string `firestore:"author"`
-	Rating  int    `firestore:"rating"`
-	Comment string `firestore:"comment"`
+	Author  string  `firestore:"author"`
+	Rating  float64 `firestore:"rating"`
+	Comment string  `firestore:"comment"`
 }
 
 type listing struct {
@@ -31,6 +30,7 @@ type listing struct {
 	Author               string        `firestore:"author"`
 	Ratings              []rating      `firestore:"ratings"`
 	Applications         []application `firestore:"applications"`
+	PricePerNight        float64       `firestore:"price"`
 }
 
 type application struct {
@@ -50,7 +50,7 @@ func getFirestoreClient() (*firestore.Client, error) {
 }
 
 func getUser(ctx context.Context, client *firestore.Client, userID string) (*user, error) {
-	docRef := client.Collection("user").Doc(userID)
+	docRef := client.Collection("users").Doc(userID)
 
 	snapshot, err := docRef.Get(ctx)
 
@@ -58,40 +58,25 @@ func getUser(ctx context.Context, client *firestore.Client, userID string) (*use
 		return nil, err
 	}
 
-	if snapshot.Exists() {
-		data := snapshot.Data()
+	var user user
+	if err := snapshot.DataTo(&user); err != nil {
 
-		if data != nil {
-			jsonBytes, err := json.Marshal(data)
-
-			if err != nil {
-				return nil, err
-			}
-
-			var User user
-
-			err = json.Unmarshal(jsonBytes, &User)
-
-			if err != nil {
-				return nil, err
-			}
-
-			return &User, nil
-		}
-	} else {
-		return nil, errors.New("LISTING_NOT_FOUND")
+		return nil, fmt.Errorf("failed to convert firestore data to user struct: %w", err)
 	}
-	return nil, errors.New("NORESULT")
+
+	return &user, nil
 }
 
-func createUser(ctx context.Context, client *firestore.Client, User user) error {
-	_, err := client.Collection("users").Doc(User.ID).Create(ctx, User)
+func createUser(ctx context.Context, client *firestore.Client, User user) (string, error) {
+	docRef, _, err := client.Collection("users").Add(ctx, User)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	User.ID = docRef.ID
+
+	return User.ID, nil
 }
 
 func updateUser(ctx context.Context, client *firestore.Client, User user) error {
@@ -123,44 +108,27 @@ func getListing(ctx context.Context, client *firestore.Client, listingID string)
 		return nil, err
 	}
 
-	if snapshot.Exists() {
-		data := snapshot.Data()
+	var Listing listing
+	if err := snapshot.DataTo(&Listing); err != nil {
 
-		if data != nil {
-			jsonBytes, err := json.Marshal(data)
-
-			if err != nil {
-				return nil, err
-			}
-
-			var Listing listing
-
-			err = json.Unmarshal(jsonBytes, &Listing)
-
-			if err != nil {
-				return nil, err
-			}
-
-			return &Listing, nil
-		}
-	} else {
-		return nil, errors.New("LISTING_NOT_FOUND")
+		return nil, fmt.Errorf("failed to convert firestore data to listing struct: %w", err)
 	}
-	return nil, errors.New("NORESULT")
+
+	return &Listing, nil
 }
 
-func createListing(ctx context.Context, client *firestore.Client, Listing listing) error {
-	_, err := client.Collection("listings").Doc(Listing.ID).Create(ctx, Listing)
+func createListing(ctx context.Context, client *firestore.Client, Listing listing) (string, error) {
+	docRef, _, err := client.Collection("listings").Add(ctx, Listing)
 
 	if err != nil {
-		return err
+		return "", nil
 	}
 
-	return nil
+	return docRef.ID, nil
 }
 
-func updateListing(ctx context.Context, client *firestore.Client, Listing listing) error {
-	_, err := client.Collection("listings").Doc(Listing.ID).Set(ctx, Listing)
+func updateListing(ctx context.Context, client *firestore.Client, Listing listing, listingId string) error {
+	_, err := client.Collection("listings").Doc(listingId).Set(ctx, Listing)
 
 	if err != nil {
 		return err
@@ -180,14 +148,14 @@ func deleteListing(ctx context.Context, client *firestore.Client, Listing listin
 }
 
 func applyForListing(ctx context.Context, client *firestore.Client, listingId string, Application application) error {
-	listing, err := getListing(ctx, client, listingId)
+	Listing, err := getListing(ctx, client, listingId)
 
 	if err != nil {
 		return err
 	}
 
-	listing.Applications = append(listing.Applications, Application)
-	return updateListing(ctx, client, *listing)
+	Listing.Applications = append(Listing.Applications, Application)
+	return updateListing(ctx, client, *Listing, listingId)
 }
 
 func unApplyForListing(ctx context.Context, client *firestore.Client, listingId string, authorId string) error {
@@ -202,7 +170,7 @@ func unApplyForListing(ctx context.Context, client *firestore.Client, listingId 
 		}
 	}
 
-	return updateListing(ctx, client, *listing)
+	return updateListing(ctx, client, *listing, listingId)
 }
 
 func rateListing(ctx context.Context, client *firestore.Client, listingId string, Rating rating) error {
@@ -212,5 +180,5 @@ func rateListing(ctx context.Context, client *firestore.Client, listingId string
 	}
 
 	listing.Ratings = append(listing.Ratings, Rating)
-	return updateListing(ctx, client, *listing)
+	return updateListing(ctx, client, *listing, listingId)
 }
