@@ -1,6 +1,6 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  (typeof window === 'undefined' ? "https://rentify-85260599486.us-west1.run.app" : "/api");
+  "https://rentify-85260599486.us-west2.run.app"
 
 async function parseResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
   if (!res.ok) {
