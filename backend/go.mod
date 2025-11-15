@@ -2,7 +2,10 @@ module github.com/malawarecreator/rentify/backend
 
 go 1.25.1
 
-require github.com/gin-gonic/gin v1.11.0
+require (
+	github.com/gin-contrib/cors v1.7.3
+	github.com/gin-gonic/gin v1.11.0
+)
 
 require (
 	cel.dev/expr v0.24.0 // indirect
