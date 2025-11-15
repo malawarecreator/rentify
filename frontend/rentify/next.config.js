@@ -4,7 +4,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://rentify-85260599486.us-west1.run.app/:path*',
+        destination: 'http://localhost:8080/:path*',
       },
     ];
   },
