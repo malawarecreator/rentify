@@ -25,6 +25,7 @@ const ListingFeed: React.FC<ListingFeedProps> = ({
     );
   }
 
+  // If there's an error, show error regardless of listings (don't show fallback data)
   if (error) {
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/40 p-6 text-sm text-red-700 dark:text-red-200 space-y-3">

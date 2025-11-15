@@ -47,7 +47,6 @@ export function useListings() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [usingFallback, setUsingFallback] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -56,22 +55,22 @@ export function useListings() {
     try {
       const data = await fetchListings();
       setListings(data);
-      setUsingFallback(false);
     } catch (err) {
-      console.warn("API unavailable, using fallback data:", err);
+      console.warn("API unavailable:", err);
 
       // Provide more specific error messages
-      let errorMessage = "Using demo data - API unavailable";
+      let errorMessage = "Unable to load listings. Please check your connection.";
       if (err instanceof Error) {
         if (err.message.includes('CORS')) {
-          errorMessage = "CORS error: Backend needs CORS configuration. Using demo data.";
+          errorMessage = "CORS error: Backend needs CORS configuration.";
         } else if (err.message.includes('fetch')) {
-          errorMessage = "Network error: Cannot connect to API. Using demo data.";
+          errorMessage = "Network error: Cannot connect to API.";
         }
       }
 
-      setListings(fallbackListings);
-      setUsingFallback(true);
+      // Don't show fallback listings when there's an error
+      // Just show empty listings and the error message
+      setListings([]);
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -82,5 +81,5 @@ export function useListings() {
     void refresh();
   }, [refresh]);
 
-  return { listings, loading, error, refresh, usingFallback };
+  return { listings, loading, error, refresh };
 }

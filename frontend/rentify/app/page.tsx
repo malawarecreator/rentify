@@ -9,7 +9,7 @@ import { useListings } from "@/hooks/useListings";
 import { useUser } from "@/components/user/UserProvider";
 
 export default function Home() {
-  const { listings, loading, error, refresh, usingFallback } = useListings();
+  const { listings, loading, error, refresh } = useListings();
   const { user } = useUser();
 
   return (
@@ -22,10 +22,7 @@ export default function Home() {
             Share something with your neighbors
           </h2>
           <p className="mt-3 text-sm theme-text-secondary leading-relaxed">
-            {usingFallback
-              ? "Currently showing demo data. The live backend is temporarily unavailable."
-              : "Rentify connects you with your neighbors. Post items, browse listings, and make local connections."
-            }
+            Rentify connects you with your neighbors. Post items, browse listings, and make local connections.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <Link
@@ -45,14 +42,6 @@ export default function Home() {
               >
                 Create an account
               </Link>
-            )}
-            {usingFallback && (
-              <button
-                onClick={refresh}
-                className="rounded-full theme-border-secondary theme-bg-primary px-3 py-1 theme-text-secondary hover:theme-border-primary"
-              >
-                Retry API
-              </button>
             )}
           </div>
         </section>
