@@ -1,0 +1,12 @@
+{
+  "id": "alphanumeric",
+  "title": "string",
+  "body": "string",
+  "storageRelationLinks": [
+    "string"
+  ],
+  "author": "alphanumeric",
+  "ratings": [
+    "rating"
+  ]
+}

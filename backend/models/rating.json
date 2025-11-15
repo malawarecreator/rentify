@@ -1,0 +1,5 @@
+{
+  "author": "alphanumeric",
+  "rating": "number",
+  "comment": "string"
+}

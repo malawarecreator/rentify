@@ -1,0 +1,6 @@
+{
+  "id": "alphanumeric",
+  "name": "string",
+  "email": "string",
+  "password": "string"
+}
