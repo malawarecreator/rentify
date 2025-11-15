@@ -27,9 +27,24 @@ async function parseResponse<T>(res: Response, fallbackMessage: string): Promise
   }
 
   try {
-    return (await res.json()) as T;
+    // Check if response has content before trying to parse JSON
+    const contentLength = res.headers.get('content-length');
+    const contentType = res.headers.get('content-type');
+
+    // If no content-length or content-type doesn't indicate JSON, return empty object
+    if (contentLength === '0' || !contentType?.includes('application/json')) {
+      return {} as T;
+    }
+
+    const text = await res.text();
+    if (!text.trim()) {
+      // Empty response body
+      return {} as T;
+    }
+
+    return JSON.parse(text) as T;
   } catch (error) {
-    console.error('Failed to parse JSON response:', error);
+    console.error('Failed to parse JSON response:', error, 'Response status:', res.status);
     throw new Error(`${fallbackMessage}: Invalid response format`);
   }
 }
@@ -274,6 +289,22 @@ export async function rateListing(
   );
 
   await parseResponse<unknown>(res, "Unable to rate listing");
+}
+
+export async function approveApplication(
+  listingId: string,
+  listingCreatorId: string,
+  applicationAuthorId: string
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/approveApplication?id=${encodeURIComponent(listingId)}&creator=${encodeURIComponent(listingCreatorId)}&applicationAuthor=${encodeURIComponent(applicationAuthorId)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }
+  );
+
+  await parseResponse<unknown>(res, "Unable to approve application");
 }
 
 export interface CreateUserPayload {

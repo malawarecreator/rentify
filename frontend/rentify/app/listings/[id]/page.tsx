@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import {
   applyForListing,
+  approveApplication,
   fetchListing,
   rateListing,
   type Listing,
@@ -20,6 +21,9 @@ export default function ListingDetailPage() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Check if current user is the owner of this listing
+  const isOwner = listing && user && listing.author === user.id;
 
   const [applicationMessage, setApplicationMessage] = useState("");
   const [applyStatus, setApplyStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -96,6 +100,11 @@ export default function ListingDetailPage() {
       setRatingStatus("error");
       return;
     }
+    if (isOwner) {
+      setRatingError("You cannot rate your own listing.");
+      setRatingStatus("error");
+      return;
+    }
 
     setRatingStatus("loading");
     setRatingError(null);
@@ -112,6 +121,33 @@ export default function ListingDetailPage() {
       const message = err instanceof Error ? err.message : "Unable to rate listing";
       setRatingError(message);
       setRatingStatus("error");
+    }
+  };
+
+  const handleApproveApplication = async (applicantId: string) => {
+    if (!user || !listing) return;
+
+    try {
+      await approveApplication(listingId, user.id, applicantId);
+      console.log("Application approved for applicant:", applicantId);
+
+      // Optimistically update both the listing availability and the application status
+      setListing(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          available: false, // Mark listing as unavailable
+          applications: prev.applications.map(app =>
+            app.author === applicantId ? { ...app, status: 'approved' } : app
+          )
+        };
+      });
+
+      // Note: Not calling loadListing() to avoid overriding optimistic updates
+      // The server may not update these statuses immediately
+    } catch (err) {
+      console.error("Failed to approve application:", err);
+      // Could add error state for approval failures
     }
   };
 
@@ -184,35 +220,71 @@ export default function ListingDetailPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-6">
-              <h2 className="text-2xl font-semibold text-gray-900">Apply to rent</h2>
-              <form onSubmit={handleApply} className="space-y-4">
-                <textarea
-                  value={applicationMessage}
-                  onChange={(event) => setApplicationMessage(event.target.value)}
-                  placeholder="Share a quick note about how you'll use this item"
-                  rows={4}
-                  className="w-full rounded-lg border border-green-200 bg-white p-3 text-sm focus:border-green-500 focus:outline-none"
-                  disabled={!user}
-                />
-                {!user && (
-                  <p className="text-xs text-red-500">
-                    Log in to submit an application.
-                  </p>
+            {!isOwner && (
+              <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Apply to rent</h2>
+                <form onSubmit={handleApply} className="space-y-4">
+                  <textarea
+                    value={applicationMessage}
+                    onChange={(event) => setApplicationMessage(event.target.value)}
+                    placeholder="Share a quick note about how you'll use this item"
+                    rows={4}
+                    className="w-full rounded-lg border border-green-200 bg-white p-3 text-sm focus:border-green-500 focus:outline-none"
+                    disabled={!user}
+                  />
+                  {!user && (
+                    <p className="text-xs text-red-500">
+                      Log in to submit an application.
+                    </p>
+                  )}
+                  {applyError && <p className="text-xs text-red-500">{applyError}</p>}
+                  {applyStatus === "success" && (
+                    <p className="text-xs text-green-600">Application sent! The owner will review it soon.</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!user || applyStatus === "loading"}
+                    className="w-full rounded-lg bg-green-600 px-6 py-3 text-lg font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {applyStatus === "loading" ? "Sending…" : "Apply to rent"}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {isOwner && (
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-8 space-y-6">
+                <h2 className="text-2xl font-semibold text-gray-900">Manage Applications</h2>
+                <p className="text-gray-600">You own this listing. View and manage applications below.</p>
+                {listing.applications.length === 0 ? (
+                  <p className="text-sm text-gray-500">No applications yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {listing.applications.map((application, index) => (
+                      <div key={index} className="border border-green-200 rounded-lg p-4 bg-white">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              From: {application.author}
+                            </p>
+                            <p className="text-xs text-gray-500">Status: {application.status}</p>
+                          </div>
+                          {application.status === "pending" && (
+                            <button
+                              onClick={() => handleApproveApplication(application.author)}
+                              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-700">{application.description}</p>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {applyError && <p className="text-xs text-red-500">{applyError}</p>}
-                {applyStatus === "success" && (
-                  <p className="text-xs text-green-600">Application sent! The owner will review it soon.</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={!user || applyStatus === "loading"}
-                  className="w-full rounded-lg bg-green-600 px-6 py-3 text-lg font-semibold text-white hover:bg-green-700 disabled:opacity-60"
-                >
-                  {applyStatus === "loading" ? "Sending…" : "Apply to rent"}
-                </button>
-              </form>
-            </div>
+              </div>
+            )}
 
             <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-6">
               <h2 className="text-2xl font-semibold text-gray-900">Ratings</h2>
@@ -231,60 +303,50 @@ export default function ListingDetailPage() {
                 )}
               </div>
 
-              <form onSubmit={handleRate} className="space-y-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-gray-700">Rating</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    step={0.5}
-                    value={ratingValue}
-                    onChange={(event) => setRatingValue(Number(event.target.value))}
-                    className="w-32 rounded-lg border border-green-200 p-2"
+              {!isOwner && (
+                <form onSubmit={handleRate} className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-gray-700">Rating</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      step={0.5}
+                      value={ratingValue}
+                      onChange={(event) => setRatingValue(Number(event.target.value))}
+                      className="w-32 rounded-lg border border-green-200 p-2"
+                      disabled={!user}
+                    />
+                  </div>
+                  <textarea
+                    value={ratingComment}
+                    onChange={(event) => setRatingComment(event.target.value)}
+                    placeholder="Share feedback with the community"
+                    rows={3}
+                    className="w-full rounded-lg border border-green-200 p-3 text-sm focus:border-green-500 focus:outline-none"
                     disabled={!user}
                   />
+                  {ratingError && <p className="text-xs text-red-500">{ratingError}</p>}
+                  {ratingStatus === "success" && (
+                    <p className="text-xs text-green-600">Thanks for submitting a review.</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!user || ratingStatus === "loading"}
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {ratingStatus === "loading" ? "Submitting…" : "Leave a review"}
+                  </button>
+                </form>
+              )}
+
+              {isOwner && (
+                <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                  You cannot rate your own listing.
                 </div>
-                <textarea
-                  value={ratingComment}
-                  onChange={(event) => setRatingComment(event.target.value)}
-                  placeholder="Share feedback with the community"
-                  rows={3}
-                  className="w-full rounded-lg border border-green-200 p-3 text-sm focus:border-green-500 focus:outline-none"
-                  disabled={!user}
-                />
-                {ratingError && <p className="text-xs text-red-500">{ratingError}</p>}
-                {ratingStatus === "success" && (
-                  <p className="text-xs text-green-600">Thanks for submitting a review.</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={!user || ratingStatus === "loading"}
-                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-60"
-                >
-                  {ratingStatus === "loading" ? "Submitting…" : "Leave a review"}
-                </button>
-              </form>
+              )}
             </div>
 
-            {listing.applications.length > 0 && (
-              <div className="rounded-2xl border border-green-200 bg-white p-8 space-y-4">
-                <h2 className="text-2xl font-semibold text-gray-900">Applications</h2>
-                <ul className="space-y-3 text-sm">
-                  {listing.applications.map((application, index) => (
-                    <li key={index} className="rounded-lg border border-green-100 p-4">
-                      <p className="font-semibold text-gray-900">
-                        {application.author}
-                        <span className="ml-2 text-xs uppercase tracking-wide text-gray-500">
-                          {application.status}
-                        </span>
-                      </p>
-                      <p className="text-gray-700 mt-1">{application.description}</p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </>
         )}
       </div>
